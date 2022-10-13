@@ -45,7 +45,7 @@
                                    aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"
                                    class="${properties.kcInputClass!}" name="username"
                                    value="${(login.username!'')}"
-                                   type="text" autofocus autocomplete="username webauthn"/>
+                                   type="text" autofocus autocomplete="username<#if conditionalUIEnabled> webauthn</#if>"/>
                         </#if>
 
                         <#if messagesPerField.existsError('username')>
@@ -54,6 +54,22 @@
                             </span>
                         </#if>
                     </div>
+
+                    <#if !usernameOnly>
+                        <div class="${properties.kcFormGroupClass!}">
+                            <label for="password" class="${properties.kcLabelClass!}">${msg("password")}</label>
+
+                            <input tabindex="2" id="password" class="${properties.kcInputClass!}" name="password" type="password" autocomplete="current-password<#if conditionalUIEnabled> webauthn</#if>"
+                                   aria-invalid="<#if messagesPerField.existsError('username','password')>true</#if>"
+                            />
+
+                            <#if usernameHidden?? && messagesPerField.existsError('username','password')>
+                                <span id="input-error" class="${properties.kcInputErrorMessageClass!}" aria-live="polite">
+                                        ${kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc}
+                                </span>
+                            </#if>
+                        </div>
+                    </#if>
 
                     <div class="${properties.kcFormGroupClass!} ${properties.kcFormSettingClass!}">
                         <div id="kc-form-options">
@@ -83,7 +99,7 @@
         </div>
     </div>
 
-    <form id="webauthn-form" class="${properties.kcFormClass!}" style="display: none;">
+    <form id="webauthn-form" class="${properties.kcFormClass!}" style="display: none">
         <div class="login-pf-header">
             <h1>OR</h1>
         </div>
@@ -99,14 +115,28 @@
     <script type="text/javascript" src="${url.resourcesPath}/js/base64url.js"></script>
     <script type="text/javascript">
         window.onload = () => {
-            if (!PublicKeyCredential.isConditionalMediationAvailable ||
-                !PublicKeyCredential.isConditionalMediationAvailable()) {
-                let form = document.getElementById("webauthn-form");
-                form.style.display = "";
+            if (!${conditionalUIEnabled?c} || !window.PublicKeyCredential.isConditionalMediationAvailable) {
+                showWebAuthnForm();
                 return;
             }
-            webAuthnAuthenticate(true);
+            window.PublicKeyCredential.isConditionalMediationAvailable()
+                .then((result) => {
+                    if (!result) {
+                        showWebAuthnForm();
+                        return;
+                    }
+                    webAuthnAuthenticate(true);
+                })
+                .catch((err) => {
+                    $("#error").val(err);
+                    $("#webauth").submit();
+                });
         };
+
+        function showWebAuthnForm() {
+            let form = document.getElementById("webauthn-form");
+            form.style.display = "";
+        }
 
         function webAuthnAuthenticate(useConditionalUI) {
             let isUserIdentified = ${isUserIdentified};
